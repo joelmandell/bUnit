@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net6.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.Coyote" Version="1.5.4" />
+		<PackageReference Include="Microsoft.Coyote.Test" Version="1.5.4" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\src\bunit.core\bunit.core.csproj" />
+	  <ProjectReference Include="..\..\src\bunit.web\bunit.web.csproj" />
+	  <ProjectReference Include="..\bunit.testassets\bunit.testassets.csproj" />
+	</ItemGroup>
+
+</Project>

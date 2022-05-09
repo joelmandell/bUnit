@@ -1,0 +1,10 @@
+{
+	"AssembliesPath": "bin/debug/net6.0",
+	"OutputPath": "bin/net6.0/rewritten",
+	"Assemblies": [
+		"AngleSharpWrappers.dll",
+		 "bunit.coyotetest.dll",
+		 "Bunit.Core.dll",
+		 "Bunit.TestAssets.dll"
+	]
+}
