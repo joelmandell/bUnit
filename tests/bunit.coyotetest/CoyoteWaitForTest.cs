@@ -1,11 +1,26 @@
 using AngleSharp.Dom;
+using Bunit.Extensions.WaitForHelpers;
+using Bunit.TestAssets.BlazorE2E;
 using Microsoft.Coyote.SystematicTesting;
 using Xunit.Abstractions;
 
-namespace Bunit.Extensions.WaitForHelpers;
+namespace Bunit;
 
-public class RenderedFragmentWaitForHelperExtensionsCoyoteTest
+public class CoyoteWaitForTest
 {
+	[Test]
+	public void CanDoubleDispatchRenderToSyncContext()
+	{
+		using var ctx = new TestContext();
+
+		var cut = ctx.RenderComponent<DispatchingComponent>();
+		var result = cut.Find("#result");
+
+		cut.Find("#run-with-double-dispatch").Click();
+
+		cut.WaitForAssertion(() => Assert.Equal("Success (completed synchronously)", result.TextContent.Trim()));
+	}
+
 	[Test]
 	public static void Test110()
 	{
@@ -24,28 +39,6 @@ public class RenderedFragmentWaitForHelperExtensionsCoyoteTest
 		// This click causes two renders, thus something is needed to await here.
 		cut.Find("#tock").Click();
 		cut.WaitForAssertion(() => cut.Find("#state").TextContent.ShouldBe("Stopped"));
-	}
-
-	[Test]
-	public static void Test013()
-	{
-		using var ctx = new TestContext();
-
-		const string expectedInnerMessage = "INNER MESSAGE";
-		var cut = ctx.RenderComponent<TwoRendersTwoChanges>();
-		cut.Find("#tick").Click();
-		cut.Find("#tock").Click();
-
-		var expected = Should.Throw<WaitForFailedException>(() =>
-			cut.WaitForState(() =>
-			{
-				if (cut.Find("#state").TextContent == "Stopped")
-					throw new InvalidOperationException(expectedInnerMessage);
-				return false;
-			}));
-
-		expected.InnerException.ShouldBeOfType<InvalidOperationException>()
-			.Message.ShouldBe(expectedInnerMessage);
 	}
 
 	[Test]
