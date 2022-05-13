@@ -6,10 +6,10 @@ using Xunit.Abstractions;
 
 namespace Bunit;
 
-public class CoyoteWaitForTest
+public static class CoyoteWaitForTest
 {
 	[Test]
-	public void CanDoubleDispatchRenderToSyncContext()
+	public static void CanDoubleDispatchRenderToSyncContext()
 	{
 		using var ctx = new TestContext();
 
