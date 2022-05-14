@@ -8,7 +8,6 @@ namespace Bunit.Rendering;
 /// </summary>
 public class TestRenderer : Renderer, ITestRenderer
 {
-	private readonly object renderTreeAccessLock = new();
 	private readonly Dictionary<int, IRenderedFragmentBase> renderedComponents = new();
 	private readonly List<RootComponent> rootComponents = new();
 	private readonly ILogger<TestRenderer> logger;
@@ -20,7 +19,7 @@ public class TestRenderer : Renderer, ITestRenderer
 	public Task<Exception> UnhandledException => unhandledExceptionTsc.Task;
 
 	/// <inheritdoc/>
-	public override Dispatcher Dispatcher { get; } = Dispatcher.CreateDefault();
+	public override Dispatcher Dispatcher { get; } = new TestRendererSynchronizationContextDispatcher(); // Dispatcher.CreateDefault();
 
 	/// <summary>
 	/// Initializes a new instance of the <see cref="TestRenderer"/> class.
@@ -146,17 +145,8 @@ public class TestRenderer : Renderer, ITestRenderer
 	/// <inheritdoc/>
 	protected override void ProcessPendingRender()
 	{
-		// the lock is in place to avoid a race condition between
-		// the dispatchers thread and the test frameworks thread,
-		// where one will read the current render tree (find components)
-		// while the other thread (the renderer) updates the
-		// render tree.
-		lock (renderTreeAccessLock)
-		{
-			logger.LogProcessingPendingRenders();
-
-			base.ProcessPendingRender();
-		}
+		logger.LogProcessingPendingRenders();
+		base.ProcessPendingRender();
 	}
 
 	/// <inheritdoc/>
@@ -277,15 +267,7 @@ public class TestRenderer : Renderer, ITestRenderer
 		var result = new List<IRenderedComponentBase<TComponent>>();
 		var framesCollection = new RenderTreeFrameDictionary();
 
-		// the lock is in place to avoid a race condition between
-		// the dispatchers thread and the test frameworks thread,
-		// where one will read the current render tree (this method)
-		// while the other thread (the renderer) updates the
-		// render tree.
-		lock (renderTreeAccessLock)
-		{
-			FindComponentsInternal(parentComponent.ComponentId);
-		}
+		FindComponentsInternal(parentComponent.ComponentId);
 
 		return result;
 

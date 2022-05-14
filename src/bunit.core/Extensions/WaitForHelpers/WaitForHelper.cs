@@ -44,7 +44,6 @@ public abstract class WaitForHelper<T> : IDisposable
 	/// <summary>
 	/// Initializes a new instance of the <see cref="WaitForHelper{T}"/> class.
 	/// </summary>
-	[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1849:Call async methods when in an async method", Justification = "Using x.Result inside a ContinueWith is safe.")]
 	protected WaitForHelper(IRenderedFragmentBase renderedFragment, Func<(bool CheckPassed, T Content)> completeChecker, TimeSpan? timeout = null)
 	{
 		this.renderedFragment = renderedFragment ?? throw new ArgumentNullException(nameof(renderedFragment));

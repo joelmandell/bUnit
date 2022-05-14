@@ -7,8 +7,7 @@ namespace Bunit.Rendering;
 internal class RenderedFragment : IRenderedFragment
 {
 	[SuppressMessage("Usage", "CA2213:Disposable fields should be disposed", Justification = "Owned by TestServiceProvider, disposed by it.")]
-	private readonly BunitHtmlParser htmlParser;
-	private readonly object markupAccessLock = new();
+	private BunitHtmlParser htmlParser;
 	private string markup = string.Empty;
 	private string? snapshotMarkup;
 
@@ -39,18 +38,7 @@ internal class RenderedFragment : IRenderedFragment
 		get
 		{
 			EnsureComponentNotDisposed();
-
-			// The lock prevents a race condition between the renderers thread
-			// and the test frameworks thread, where one might be reading the Markup
-			// while the other is updating it due to async code in a rendered component.
-			lock (markupAccessLock)
-			{
-				// Volatile read is necessary to ensure the updated markup
-				// is available across CPU cores. Without it, the pointer to the
-				// markup string can be stored in a CPUs register and not
-				// get updated when another CPU changes the string.
-				return Volatile.Read(ref markup);
-			}
+			return markup;
 		}
 	}
 
@@ -63,15 +51,10 @@ internal class RenderedFragment : IRenderedFragment
 		get
 		{
 			EnsureComponentNotDisposed();
+			if (latestRenderNodes is null)
+				latestRenderNodes = htmlParser.Parse(Markup);
 
-			// The lock ensures that latest nodes is always based on the latest rendered markup.
-			lock (markupAccessLock)
-			{
-				if (latestRenderNodes is null)
-					latestRenderNodes = htmlParser.Parse(Markup);
-
-				return latestRenderNodes;
-			}
+			return latestRenderNodes;
 		}
 	}
 
@@ -126,21 +109,15 @@ internal class RenderedFragment : IRenderedFragment
 			return;
 		}
 
-		// The lock prevents a race condition between the renderers thread
-		// and the test frameworks thread, where one might be reading the Markup
-		// while the other is updating it due to async code in a rendered component.
-		lock (markupAccessLock)
+		if (rendered)
 		{
-			if (rendered)
-			{
-				OnRender(renderEvent);
-				RenderCount++;
-			}
+			OnRender(renderEvent);
+			RenderCount++;
+		}
 
-			if (changed)
-			{
-				UpdateMarkup(renderEvent.Frames);
-			}
+		if (changed)
+		{
+			UpdateMarkup(renderEvent.Frames);
 		}
 
 		// The order here is important, since consumers of the events
@@ -155,23 +132,17 @@ internal class RenderedFragment : IRenderedFragment
 
 	protected void UpdateMarkup(RenderTreeFrameDictionary framesCollection)
 	{
-		// The lock prevents a race condition between the renderers thread
-		// and the test frameworks thread, where one might be reading the Markup
-		// while the other is updating it due to async code in a rendered component.
-		lock (markupAccessLock)
-		{
-			latestRenderNodes = null;
-			var newMarkup = Htmlizer.GetHtml(ComponentId, framesCollection);
+		latestRenderNodes = null;
+		var newMarkup = Htmlizer.GetHtml(ComponentId, framesCollection);
 
-			// Volatile write is necessary to ensure the updated markup
-			// is available across CPU cores. Without it, the pointer to the
-			// markup string can be stored in a CPUs register and not
-			// get updated when another CPU changes the string.
-			Volatile.Write(ref markup, newMarkup);
+		// Volatile write is necessary to ensure the updated markup
+		// is available across CPU cores. Without it, the pointer to the
+		// markup string can be stored in a CPUs register and not
+		// get updated when another CPU changes the string.
+		markup = newMarkup;
 
-			if (RenderCount == 1)
-				FirstRenderMarkup = newMarkup;
-		}
+		if (RenderCount == 1)
+			FirstRenderMarkup = newMarkup;
 	}
 
 	protected virtual void OnRender(RenderEvent renderEvent) { }
@@ -206,6 +177,7 @@ internal class RenderedFragment : IRenderedFragment
 		if (IsDisposed || !disposing)
 			return;
 
+		htmlParser = null!;
 		IsDisposed = true;
 		markup = string.Empty;
 		OnAfterRender = null;
