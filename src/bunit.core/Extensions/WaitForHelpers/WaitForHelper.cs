@@ -9,8 +9,8 @@ namespace Bunit.Extensions.WaitForHelpers;
 /// </summary>
 public abstract class WaitForHelper<T> : IDisposable
 {
-	private readonly Timer timer;
 	private readonly TaskCompletionSource<T> checkPassedCompletionSource;
+	private readonly CancellationTokenSource cts = new();
 	private readonly Func<(bool CheckPassed, T Content)> completeChecker;
 	private readonly IRenderedFragmentBase renderedFragment;
 	private readonly ILogger<WaitForHelper<T>> logger;
@@ -52,13 +52,7 @@ public abstract class WaitForHelper<T> : IDisposable
 
 		logger = renderedFragment.Services.CreateLogger<WaitForHelper<T>>();
 		checkPassedCompletionSource = new TaskCompletionSource<T>(TaskCreationOptions.RunContinuationsAsynchronously);
-		timer = new Timer(_ =>
-		{
-			logger.LogWaiterTimedOut(renderedFragment.ComponentId);
-			checkPassedCompletionSource.TrySetException(new WaitForFailedException(TimeoutErrorMessage, capturedException));
-		});
-		WaitTask = CreateWaitTask(renderedFragment);
-		timer.Change(GetRuntimeTimeout(timeout), Timeout.InfiniteTimeSpan);
+		WaitTask = CreateWaitTask(renderedFragment, GetRuntimeTimeout(timeout));
 
 		InitializeWaiting();
 	}
@@ -87,7 +81,7 @@ public abstract class WaitForHelper<T> : IDisposable
 			return;
 
 		isDisposed = true;
-		timer.Dispose();
+		cts.Dispose();
 		checkPassedCompletionSource.TrySetCanceled();
 		renderedFragment.OnAfterRender -= OnAfterRender;
 		logger.LogWaiterDisposed(renderedFragment.ComponentId);
@@ -113,7 +107,7 @@ public abstract class WaitForHelper<T> : IDisposable
 		}
 	}
 
-	private Task<T> CreateWaitTask(IRenderedFragmentBase renderedFragment)
+	private Task<T> CreateWaitTask(IRenderedFragmentBase renderedFragment, TimeSpan timeout)
 	{
 		var renderer = renderedFragment
 			.Services
@@ -129,8 +123,16 @@ public abstract class WaitForHelper<T> : IDisposable
 			return Task.FromException<T>(exception);
 		}).Unwrap();
 
+		var timeoutTask = Task.Delay(timeout, cts.Token)
+			.ContinueWith(_ =>
+			{
+				logger.LogWaiterTimedOut(renderedFragment.ComponentId);
+				return Task.FromException<T>(new WaitForFailedException(TimeoutErrorMessage, capturedException));
+			}, TaskContinuationOptions.OnlyOnRanToCompletion)
+			.Unwrap();
+
 		return Task
-			.WhenAny(checkPassedCompletionSource.Task, failureTask)
+			.WhenAny(timeoutTask, checkPassedCompletionSource.Task, failureTask)
 			.Unwrap();
 	}
 
